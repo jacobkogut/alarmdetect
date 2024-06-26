@@ -1,19 +1,28 @@
 import { API, DynamicPlatformPlugin, Logger, PlatformAccessory, PlatformConfig, Service, Characteristic } from 'homebridge';
 
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
-import { ExamplePlatformAccessory } from './platformAccessory';
+import { AlarmListener } from './platformAccessory';
+
+import mqtt from 'mqtt';
 
 /**
  * HomebridgePlatform
  * This class is the main constructor for your plugin, this is where you should
  * parse the user config and discover/register accessories with Homebridge.
  */
-export class ExampleHomebridgePlatform implements DynamicPlatformPlugin {
+export class AlarmDetectHomebridgePlatform implements DynamicPlatformPlugin {
   public readonly Service: typeof Service = this.api.hap.Service;
   public readonly Characteristic: typeof Characteristic = this.api.hap.Characteristic;
 
   // this is used to track restored cached accessories
   public readonly accessories: PlatformAccessory[] = [];
+
+  //SPECIFIC TO ALARMDETECT PLUGIN CONFIGS
+  private alarmListenerIp : string;
+  private alarmListenerPort : number;
+  private mqttBrokerIp : number;
+  private mqttBrokerPort : number;
+
 
   constructor(
     public readonly log: Logger,
@@ -21,6 +30,28 @@ export class ExampleHomebridgePlatform implements DynamicPlatformPlugin {
     public readonly api: API,
   ) {
     this.log.debug('Finished initializing platform:', this.config.name);
+
+
+    //SPECIFIC TO ALARMDETECT PLUGIN SETTING CONFIGS
+    this.alarmListenerIp = this.config.alarmListenerIp;
+    this.alarmListenerPort = this.config.alarmListenerPort;
+
+    this.mqttBrokerIp = this.config.mqttBrokerIp;
+    this.mqttBrokerPort = this.config.mqttBrokerPort;
+    // const options = {
+    //   // Clean session
+    //   clean: true,
+    //   connectTimeout: 4000,
+    //   // Authentication
+    //   clientId: 'emqx_test',
+    //   username: 'emqx_test',
+    //   password: 'emqx_test',
+    // }
+    const mqttClient = mqtt.connect('mqtt:\\\\' + this.mqttBrokerIp + ':' + this.mqttBrokerPort);
+    mqttClient.on('connect', ()=>{
+      mqttClient.subscribe('#');
+    });
+
 
     // Homebridge 1.8.0 introduced a `log.success` method that can be used to log success messages
     // For users that are on a version prior to 1.8.0, we need a 'polyfill' for this method
@@ -93,7 +124,7 @@ export class ExampleHomebridgePlatform implements DynamicPlatformPlugin {
 
         // create the accessory handler for the restored accessory
         // this is imported from `platformAccessory.ts`
-        new ExamplePlatformAccessory(this, existingAccessory);
+        new AlarmListener(this, existingAccessory);
 
         // it is possible to remove platform accessories at any time using `api.unregisterPlatformAccessories`, e.g.:
         // remove platform accessories when no longer present
@@ -112,7 +143,7 @@ export class ExampleHomebridgePlatform implements DynamicPlatformPlugin {
 
         // create the accessory handler for the newly create accessory
         // this is imported from `platformAccessory.ts`
-        new ExamplePlatformAccessory(this, accessory);
+        new AlarmListener(this, accessory);
 
         // link the accessory to your platform
         this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);

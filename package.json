@@ -1,16 +1,16 @@
 {
   "private": true,
-  "displayName": "Plugin Name",
-  "name": "homebridge-plugin-name",
+  "displayName": "Alarm Detector",
+  "name": "homebridge-alarmdetect",
   "version": "1.0.0",
   "description": "A short description about what your plugin does.",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/USERNAME/GITHUB_PROJECT_NAME.git"
+    "url": "https://github.com/jacobkogut/alarmdetect"
   },
   "bugs": {
-    "url": "https://github.com/USERNAME/GITHUB_PROJECT_NAME/issues"
+    "url": "https://github.com/jacobkogut/alarmdetect/issues"
   },
   "engines": {
     "node": "^18.17.0 || ^20.9.0",
@@ -35,6 +35,7 @@
     "nodemon": "^3.1.0",
     "rimraf": "^5.0.5",
     "ts-node": "^10.9.2",
+    "mqtt": "5.6.0",
     "typescript": "^5.4.5"
   }
 }
