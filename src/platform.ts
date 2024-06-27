@@ -2,8 +2,15 @@ import { API, DynamicPlatformPlugin, Logger, PlatformAccessory, PlatformConfig, 
 
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
 import { AlarmListener } from './platformAccessory';
+import express, { Request, Response } from 'express';
+import bodyParser from 'body-parser';
 
-import mqtt from 'mqtt';
+interface AlarmListenerParams{
+  deviceId: string;
+  reading: boolean;
+}
+
+
 
 /**
  * HomebridgePlatform
@@ -16,12 +23,12 @@ export class AlarmDetectHomebridgePlatform implements DynamicPlatformPlugin {
 
   // this is used to track restored cached accessories
   public readonly accessories: PlatformAccessory[] = [];
+  private activeAccessories: AlarmListener[] =[];
 
   //SPECIFIC TO ALARMDETECT PLUGIN CONFIGS
-  private alarmListenerIp : string;
-  private alarmListenerPort : number;
-  private mqttBrokerIp : number;
-  private mqttBrokerPort : number;
+  private app;
+
+
 
 
   constructor(
@@ -31,27 +38,34 @@ export class AlarmDetectHomebridgePlatform implements DynamicPlatformPlugin {
   ) {
     this.log.debug('Finished initializing platform:', this.config.name);
 
+    this.app = express();
+    this.app.use(bodyParser.json());
 
-    //SPECIFIC TO ALARMDETECT PLUGIN SETTING CONFIGS
-    this.alarmListenerIp = this.config.alarmListenerIp;
-    this.alarmListenerPort = this.config.alarmListenerPort;
+    this.app.put('/reading/add/:deviceid/:reading', (req: Request, res: Response) => {
+      const { deviceid, reading } = req.params;
 
-    this.mqttBrokerIp = this.config.mqttBrokerIp;
-    this.mqttBrokerPort = this.config.mqttBrokerPort;
-    // const options = {
-    //   // Clean session
-    //   clean: true,
-    //   connectTimeout: 4000,
-    //   // Authentication
-    //   clientId: 'emqx_test',
-    //   username: 'emqx_test',
-    //   password: 'emqx_test',
-    // }
-    const mqttClient = mqtt.connect('mqtt:\\\\' + this.mqttBrokerIp + ':' + this.mqttBrokerPort);
-    mqttClient.on('connect', ()=>{
-      mqttClient.subscribe('#');
+      // Validate that reading is a number
+      const readingNumber = parseFloat(reading);
+      if (isNaN(readingNumber)) {
+        return res.status(400).send({ error: 'Reading must be a valid number' });
+      }
+
+
+      if(this.activeAccessories[deviceid] === undefined){
+        this.addDevice({deviceId: deviceid, reading:true});
+      }
+      this.activeAccessories[deviceid].updateReading(true);
+
+
+
+      res.status(200).send({ message: 'Reading updated successfully', reading:reading, deviceid:deviceid });
     });
 
+    const port = 8080;
+
+    this.app.listen(port, () => {
+      this.log.info(`Server is running on http://localhost:${port}`);
+    });
 
     // Homebridge 1.8.0 introduced a `log.success` method that can be used to log success messages
     // For users that are on a version prior to 1.8.0, we need a 'polyfill' for this method
@@ -66,11 +80,17 @@ export class AlarmDetectHomebridgePlatform implements DynamicPlatformPlugin {
     this.api.on('didFinishLaunching', () => {
       log.debug('Executed didFinishLaunching callback');
       // run the method to discover / register your devices as accessories
+      const uuid = this.api.hap.uuid.generate('help');
+
+      const accessory = new this.api.platformAccessory('name', uuid);
+      this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
       this.discoverDevices();
     });
+
+
   }
 
-  /**
+  /*
    * This function is invoked when homebridge restores cached accessories from disk at startup.
    * It should be used to set up event handlers for characteristics and update respective values.
    */
@@ -87,67 +107,35 @@ export class AlarmDetectHomebridgePlatform implements DynamicPlatformPlugin {
    * must not be registered again to prevent "duplicate UUID" errors.
    */
   discoverDevices() {
+  }
 
-    // EXAMPLE ONLY
-    // A real plugin you would discover accessories from the local network, cloud services
-    // or a user-defined array in the platform config.
-    const exampleDevices = [
-      {
-        exampleUniqueId: 'ABCD',
-        exampleDisplayName: 'Bedroom',
-      },
-      {
-        exampleUniqueId: 'EFGH',
-        exampleDisplayName: 'Kitchen',
-      },
-    ];
 
-    // loop over the discovered devices and register each one if it has not already been registered
-    for (const device of exampleDevices) {
+  addDevice(device: AlarmListenerParams) {
 
-      // generate a unique id for the accessory this should be generated from
-      // something globally unique, but constant, for example, the device serial
-      // number or MAC address
-      const uuid = this.api.hap.uuid.generate(device.exampleUniqueId);
+    const uuid = this.api.hap.uuid.generate(device.deviceId);
 
-      // see if an accessory with the same uuid has already been registered and restored from
-      // the cached devices we stored in the `configureAccessory` method above
-      const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
+    const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
 
-      if (existingAccessory) {
-        // the accessory already exists
-        this.log.info('Restoring existing accessory from cache:', existingAccessory.displayName);
+    if (existingAccessory) {
+      // the accessory already exists
+      this.log.info('Restoring existing accessory from cache:', existingAccessory.displayName);
 
-        // if you need to update the accessory.context then you should run `api.updatePlatformAccessories`. e.g.:
-        // existingAccessory.context.device = device;
-        // this.api.updatePlatformAccessories([existingAccessory]);
+      this.activeAccessories[device.deviceId] = new AlarmListener(this, existingAccessory);
 
-        // create the accessory handler for the restored accessory
-        // this is imported from `platformAccessory.ts`
-        new AlarmListener(this, existingAccessory);
+    } else {
+      // the accessory does not yet exist, so we need to create it
+      this.log.info('Adding new accessory:', device.deviceId);
 
-        // it is possible to remove platform accessories at any time using `api.unregisterPlatformAccessories`, e.g.:
-        // remove platform accessories when no longer present
-        // this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [existingAccessory]);
-        // this.log.info('Removing existing accessory from cache:', existingAccessory.displayName);
-      } else {
-        // the accessory does not yet exist, so we need to create it
-        this.log.info('Adding new accessory:', device.exampleDisplayName);
+      // create a new accessory
+      const accessory = new this.api.platformAccessory(device.deviceId, uuid);
 
-        // create a new accessory
-        const accessory = new this.api.platformAccessory(device.exampleDisplayName, uuid);
+      accessory.context.device = device;
 
-        // store a copy of the device object in the `accessory.context`
-        // the `context` property can be used to store any data about the accessory you may need
-        accessory.context.device = device;
+      this.activeAccessories[device.deviceId] = new AlarmListener(this, accessory);
 
-        // create the accessory handler for the newly create accessory
-        // this is imported from `platformAccessory.ts`
-        new AlarmListener(this, accessory);
-
-        // link the accessory to your platform
-        this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
-      }
+      // link the accessory to your platform
+      this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
     }
+
   }
 }
