@@ -24,7 +24,7 @@ export class AlarmListener {
     setInterval(()=>{
 
       if(this.lastDetectedDate !== undefined && this.isOccupancyDetectedInLast5Mins()){
-        this.service.updateCharacteristic(this.platform.Characteristic.OccupancyDetected, false);
+        this.service.setCharacteristic(this.platform.Characteristic.OccupancyDetected, false);
       }
     }, 60000);
 
@@ -61,7 +61,9 @@ export class AlarmListener {
   }
 
   updateReading(reading: boolean){
-    this.service.updateCharacteristic(this.platform.Characteristic.OccupancyDetected, reading);
-    this.lastDetectedDate = new Date();
+    if(reading){
+      this.lastDetectedDate = new Date();
+    }
+    this.service.setCharacteristic(this.platform.Characteristic.OccupancyDetected, reading);
   }
 }

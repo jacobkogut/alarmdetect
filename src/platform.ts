@@ -11,7 +11,6 @@ interface AlarmListenerParams{
 }
 
 
-
 /**
  * HomebridgePlatform
  * This class is the main constructor for your plugin, this is where you should
@@ -27,9 +26,6 @@ export class AlarmDetectHomebridgePlatform implements DynamicPlatformPlugin {
 
   //SPECIFIC TO ALARMDETECT PLUGIN CONFIGS
   private app;
-
-
-
 
   constructor(
     public readonly log: Logger,
@@ -56,8 +52,6 @@ export class AlarmDetectHomebridgePlatform implements DynamicPlatformPlugin {
       }
       this.activeAccessories[deviceid].updateReading(true);
 
-
-
       res.status(200).send({ message: 'Reading updated successfully', reading:reading, deviceid:deviceid });
     });
 
@@ -80,14 +74,8 @@ export class AlarmDetectHomebridgePlatform implements DynamicPlatformPlugin {
     this.api.on('didFinishLaunching', () => {
       log.debug('Executed didFinishLaunching callback');
       // run the method to discover / register your devices as accessories
-      const uuid = this.api.hap.uuid.generate('help');
-
-      const accessory = new this.api.platformAccessory('name', uuid);
-      this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
       this.discoverDevices();
     });
-
-
   }
 
   /*
